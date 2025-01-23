@@ -5,14 +5,20 @@ const cors = require('cors');
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cors());
+
+app.use(cors({
+    origin: 'https://your-frontend-domain.com',  // Replace with your frontend URL
+    methods: 'GET, POST, PUT, DELETE',
+    allowedHeaders: 'Content-Type, Authorization'
+}));
 
 // MySQL Database Connection
 const db = mysql.createConnection({
     host: 'sql12.freesqldatabase.com',      // Change this to your MySQL host (e.g., IP address or hostname)
     user: 'sql12759142',           // Replace with your MySQL username
     password: 'emTAIpRLLw', // Replace with your MySQL password
-    database: 'sql12759142'    // The database we created earlier
+    database: 'sql12759142',    // The database we created earlier
+    port: 3306                             
 });
 
 // Connect to MySQL
@@ -23,6 +29,29 @@ db.connect(err => {
     }
     console.log('Connected to MySQL database jn_mysql');
 });
+
+// Function to handle reconnect
+function handleDisconnect() {
+    db.connect(err => {
+        if (err) {
+            console.error('Error connecting to the database:', err);
+            setTimeout(handleDisconnect, 2000); // Try reconnecting in 2 seconds
+            return;
+        }
+        console.log('Connected to MySQL database');
+    });
+
+    db.on('error', err => {
+        console.error('MySQL error:', err);
+        if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+            handleDisconnect(); // Reconnect if connection is lost
+        } else {
+            throw err;
+        }
+    });
+}
+
+handleDisconnect();
 
 // API Endpoints
 
@@ -109,7 +138,7 @@ app.delete('/api/users/:id', (req, res) => {
 });
 
 // Start Server
-const PORT = 3306;
+const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
