@@ -9,10 +9,10 @@ app.use(cors());
 
 // MySQL Database Connection
 const db = mysql.createConnection({
-    host: 'localhost',      // Change this to your MySQL host (e.g., IP address or hostname)
-    user: 'root',           // Replace with your MySQL username
-    password: '', // Replace with your MySQL password
-    database: 'jn_mysql'    // The database we created earlier
+    host: 'sql12.freesqldatabase.com',      // Change this to your MySQL host (e.g., IP address or hostname)
+    user: 'sql12759142',           // Replace with your MySQL username
+    password: 'emTAIpRLLw', // Replace with your MySQL password
+    database: 'sql12759142'    // The database we created earlier
 });
 
 // Connect to MySQL
@@ -109,7 +109,7 @@ app.delete('/api/users/:id', (req, res) => {
 });
 
 // Start Server
-const PORT = 3000;
+const PORT = 3306;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
