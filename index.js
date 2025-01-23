@@ -138,7 +138,7 @@ app.delete('/api/users/:id', (req, res) => {
 });
 
 // Start Server
-const PORT = 3000;
+const PORT = 3300;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
