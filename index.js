@@ -180,6 +180,15 @@ app.delete('/products/:id', (req, res) => {
     });
 });
 
+// Delete All Products
+app.delete('/products', (req, res) => {
+    const query = 'DELETE FROM products';
+    db.query(query, (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'All products deleted successfully' });
+    });
+});
+
 // Start Server
 const PORT = 3300;
 app.listen(PORT, () => {
