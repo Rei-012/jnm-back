@@ -18,7 +18,7 @@ const db = mysql.createConnection({
     user: 'sql12759142',           // Replace with your MySQL username
     password: 'emTAIpRLLw', // Replace with your MySQL password
     database: 'sql12759142',    // The database we created earlier
-    port: 3306                             
+    port: 3306
 });
 
 // Connect to MySQL
@@ -141,11 +141,45 @@ app.delete('/api/users/:id', (req, res) => {
 app.get('/products', (req, res) => {
     const query = 'SELECT * FROM products';
     db.query(query, (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json(results); // Return the list of products as JSON
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results); // Return the list of products as JSON
     });
-  });
-  
+});
+
+// Add New Product
+app.post('/products', (req, res) => {
+    const { name, price, stock_quantity } = req.body;
+    const query = 'INSERT INTO products (name, price, stock_quantity) VALUES (?, ?, ?)';
+
+    db.query(query, [name, price, stock_quantity], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json({ message: 'Product added successfully', productId: result.insertId });
+    });
+});
+
+// Update Product
+app.put('/products/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, price, stock_quantity } = req.body;
+    const query = 'UPDATE products SET name = ?, price = ?, stock_quantity = ? WHERE product_id = ?';
+
+    db.query(query, [name, price, stock_quantity, id], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'Product updated successfully' });
+    });
+});
+
+// Delete Product
+app.delete('/products/:id', (req, res) => {
+    const { id } = req.params;
+    const query = 'DELETE FROM products WHERE product_id = ?';
+
+    db.query(query, [id], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'Product deleted successfully' });
+    });
+});
+
 // Start Server
 const PORT = 3300;
 app.listen(PORT, () => {
