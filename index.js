@@ -7,7 +7,7 @@ const app = express();
 app.use(bodyParser.json());
 
 app.use(cors({
-    origin: 'https://your-frontend-domain.com',  // Replace with your frontend URL
+    origin: 'https://jnm-back-1.onrender.com.com',  // Replace with your frontend URL
     methods: 'GET, POST, PUT, DELETE',
     allowedHeaders: 'Content-Type, Authorization'
 }));
@@ -137,6 +137,15 @@ app.delete('/api/users/:id', (req, res) => {
     });
 });
 
+// Get All Products
+app.get('/products', (req, res) => {
+    const query = 'SELECT * FROM products';
+    db.query(query, (err, results) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(results); // Return the list of products as JSON
+    });
+  });
+  
 // Start Server
 const PORT = 3300;
 app.listen(PORT, () => {
