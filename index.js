@@ -1,23 +1,26 @@
+require('dotenv').config()
 const express = require('express');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(bodyParser.json());
 
 app.use(cors({
-    origin: 'https://jnm-back-1.onrender.com.com',  // Replace with your frontend URL
+    origin: 'https://jnm-back-1.onrender.com.com',
     methods: 'GET, POST, PUT, DELETE',
     allowedHeaders: 'Content-Type, Authorization'
 }));
 
 // MySQL Database Connection
 const db = mysql.createConnection({
-    host: 'sql12.freesqldatabase.com',      // Change this to your MySQL host (e.g., IP address or hostname)
-    user: 'sql12759142',           // Replace with your MySQL username
-    password: 'emTAIpRLLw', // Replace with your MySQL password
-    database: 'sql12759142',    // The database we created earlier
+    host: 'sql12.freesqldatabase.com',
+    user: 'sql12759142',
+    password: 'emTAIpRLLw',
+    database: 'sql12759142',
     port: 3306
 });
 
@@ -52,8 +55,48 @@ function handleDisconnect() {
 }
 
 handleDisconnect();
-
 // API Endpoints
+
+// --- User Registration (Admin & Cashier) ---
+app.post('/register', async (req, res) => {
+    const { username, password, role, name, email, age } = req.body;
+
+    // Validate input
+    if (!username || !password || !role || !name || !email || !age) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const query = 'INSERT INTO users (username, password, role, name, email, age) VALUES (?, ?, ?, ?, ?, ?)';
+
+    db.query(query, [username, hashedPassword, role, name, email, age], (err, result) => {
+        if (err) {
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(400).json({ error: 'Username or email already exists!' });
+            }
+            return res.status(500).json({ error: err.message });
+        }
+        res.status(201).json({ message: 'User registered successfully' });
+    });
+});
+
+// --- Authentication (Admin & Cashier Login) ---
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    const query = 'SELECT * FROM users WHERE username = ?';
+
+    db.query(query, [username], async (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ error: 'User not found' });
+
+        const user = results[0];
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) return res.status(401).json({ error: 'Invalid credentials' });
+
+        const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token });
+    });
+});
 
 // Fetch All Users
 app.get('/api/users', (req, res) => {
@@ -88,9 +131,11 @@ app.get('/api/users/:id', (req, res) => {
 
 // Create New User
 app.post('/api/users', (req, res) => {
-    const { name, email, age } = req.body;
-    const query = 'INSERT INTO users (name, email, age) VALUES (?, ?, ?)';
-    db.query(query, [name, email, age], (err, results) => {
+    const { username, password, name, email, role, age } = req.body;
+    const hashedPassword = bcrypt.hashSync(password, 10); // Hash the password
+    const query = 'INSERT INTO users (username, password, name, email, role, age) VALUES (?, ?, ?, ?, ?, ?)';
+
+    db.query(query, [username, hashedPassword, name, email, role, age], (err, results) => {
         if (err) {
             console.error('Error creating user:', err);
             res.status(500).send('Server error');
@@ -100,14 +145,63 @@ app.post('/api/users', (req, res) => {
     });
 });
 
-// Update User by ID
+// --- Update User (excluding password) ---
 app.put('/api/users/:id', (req, res) => {
     const userId = req.params.id;
-    const { name, email, age } = req.body;
-    const query = 'UPDATE users SET name = ?, email = ?, age = ? WHERE id = ?';
-    db.query(query, [name, email, age, userId], (err, results) => {
+    const { username, role, name, email, age } = req.body;
+
+    // Prepare the update fields dynamically
+    const fieldsToUpdate = {};
+    if (username) fieldsToUpdate.username = username;
+    if (role) fieldsToUpdate.role = role;
+    if (name) fieldsToUpdate.name = name;
+    if (email) fieldsToUpdate.email = email;
+    if (age !== undefined) fieldsToUpdate.age = age;
+
+    // Check if there are fields to update
+    if (Object.keys(fieldsToUpdate).length === 0) {
+        return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    // Build the SET clause dynamically
+    const setClause = Object.keys(fieldsToUpdate)
+        .map(field => `${field} = ?`)
+        .join(', ');
+
+    // Prepare values for the query
+    const values = [...Object.values(fieldsToUpdate), userId];
+
+    // Update query
+    const query = `UPDATE users SET ${setClause} WHERE id = ?`;
+
+    db.query(query, values, (err, results) => {
         if (err) {
             console.error('Error updating user:', err);
+            return res.status(500).json({ error: 'Server error' });
+        }
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// --- Change User Password ---
+app.patch('/api/users/:id/password', async (req, res) => {
+    const userId = req.params.id;
+    const { password } = req.body;
+
+    // Validate input
+    if (!password) {
+        return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const query = 'UPDATE users SET password = ? WHERE id = ?';
+
+    db.query(query, [hashedPassword, userId], (err, results) => {
+        if (err) {
+            console.error('Error changing password:', err);
             res.status(500).send('Server error');
             return;
         }
@@ -115,7 +209,7 @@ app.put('/api/users/:id', (req, res) => {
             res.status(404).send('User not found');
             return;
         }
-        res.json({ success: true });
+        res.json({ success: true, message: 'Password updated successfully' });
     });
 });
 
