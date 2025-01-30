@@ -81,21 +81,45 @@ app.post('/register', async (req, res) => {
 });
 
 // --- Authentication (Admin & Cashier Login) ---
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-    const query = 'SELECT * FROM users WHERE username = ?';
+app.post('/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({ error: "Username and password are required" });
+        }
 
-    db.query(query, [username], async (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: 'User not found' });
+        const query = 'SELECT id, username, password, role FROM users WHERE username = ?';
+        db.query(query, [username], async (err, results) => {
+            if (err) return res.status(500).json({ error: "Database error", details: err.message });
+            if (results.length === 0) return res.status(404).json({ error: "User not found" });
 
-        const user = results[0];
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) return res.status(401).json({ error: 'Invalid credentials' });
+            const user = results[0];
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+            if (!isPasswordValid) return res.status(401).json({ error: "Invalid credentials" });
 
-        const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token });
-    });
+            if (!process.env.JWT_SECRET) {
+                return res.status(500).json({ error: "Server error: JWT_SECRET is missing" });
+            }
+
+            // Generate JWT Token
+            const token = jwt.sign(
+                { userId: user.id, username: user.username, role: user.role },
+                process.env.JWT_SECRET,
+                { expiresIn: "1h" }
+            );
+
+            // Send response with user details
+            res.json({
+                token,
+                user_id: user.id,
+                username: user.username,
+                role: user.role
+            });
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
+    }
 });
 
 // Fetch All Users
